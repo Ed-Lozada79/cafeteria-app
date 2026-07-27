@@ -17,6 +17,24 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
+# ---------------------------------------------------------
+# Estilos CSS Personalizados (Espaciado del Menú Lateral)
+# ---------------------------------------------------------
+st.markdown("""
+    <style>
+        /* Ajustar el espaciado entre las opciones del radio button */
+        [data-testid="stRadio"] label {
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+            cursor: pointer;
+        }
+        
+        /* Ajustar el espacio general del contenedor del menú */
+        [data-testid="stSidebar"] div[role="radiogroup"] {
+            gap: 12px !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 @st.cache_resource
 def conectar_sheets():
