@@ -184,31 +184,38 @@ if rol == "🛒 Registrar Consumo (Cafetería)":
         df_usuarios = df_usuarios[df_usuarios["Nombre"].astype(str).str.strip() != ""]
         df_usuarios_ordenados = df_usuarios.sort_values(by="Nombre", key=lambda col: col.str.lower())
 
-        opciones_usuarios = {
-            f"{row['Nombre']} ({row['Area']})": row["Id_Usuario"]
-            for _, row in df_usuarios_ordenados.iterrows()
-        }
+        # Opción neutra por defecto
+        OPCION_VACIA = "-- Seleccionar Consumidor --"
+        
+        opciones_usuarios = {OPCION_VACIA: None}
+        for _, row in df_usuarios_ordenados.iterrows():
+            opciones_usuarios[f"{row['Nombre']} ({row['Area']})"] = row["Id_Usuario"]
 
         col1, col2 = st.columns(2)
 
         with col1:
             usuario_seleccionado = st.selectbox(
-                "Selecciona el Consumidor (Nombre - Área):",
+                "Selecciona el Consumidor (Nombre - Área) (*):",
                 options=list(opciones_usuarios.keys()),
+                index=0,
             )
             id_usuario = opciones_usuarios.get(usuario_seleccionado)
-            st.text_input("Id_Usuario / Cédula:", value=str(id_usuario), disabled=True)
+            st.text_input("Id_Usuario / Cédula:", value=str(id_usuario) if id_usuario else "", disabled=True)
 
         with col2:
-            producto = st.text_input("Producto:")
+            producto = st.text_input("Producto (*):", value="")
             cantidad = st.number_input("Cantidad:", min_value=1, value=1)
-            valor_unitario = st.number_input("Valor Unitario ($):", min_value=0, step=500)
+            valor_unitario = st.number_input("Valor Unitario ($):", min_value=0, value=0, step=500)
             total_pedido = cantidad * valor_unitario
             st.markdown(f"### Total Pedido: **${total_pedido:,.0f}**")
 
         if st.button("💾 Guardar Consumo", type="primary"):
-            if not id_usuario or not producto.strip() or total_pedido <= 0:
-                st.error("Por favor completa el nombre del producto y asegúrate que el total sea mayor a 0.")
+            if usuario_seleccionado == OPCION_VACIA or not id_usuario:
+                st.error("⚠️ Debes seleccionar un consumidor de la lista.")
+            elif not producto.strip():
+                st.error("⚠️ Debes ingresar el nombre del producto.")
+            elif total_pedido <= 0:
+                st.error("⚠️ El valor del pedido debe ser mayor a $0.")
             else:
                 confirmar_consumo_dialog(
                     id_usuario, usuario_seleccionado, producto, cantidad, valor_unitario, total_pedido, df_usuarios
@@ -228,28 +235,33 @@ elif rol == "💳 Registrar Abono (Cafetería)":
         df_usuarios = df_usuarios[df_usuarios["Nombre"].astype(str).str.strip() != ""]
         df_usuarios_ordenados = df_usuarios.sort_values(by="Nombre", key=lambda col: col.str.lower())
 
-        opciones_usuarios = {
-            f"{row['Nombre']} ({row['Area']})": row["Id_Usuario"]
-            for _, row in df_usuarios_ordenados.iterrows()
-        }
+        OPCION_VACIA = "-- Seleccionar Cliente --"
+        
+        opciones_usuarios = {OPCION_VACIA: None}
+        for _, row in df_usuarios_ordenados.iterrows():
+            opciones_usuarios[f"{row['Nombre']} ({row['Area']})"] = row["Id_Usuario"]
 
         usuario_abono_sel = st.selectbox(
-            "Selecciona el Cliente que realiza el abono:",
+            "Selecciona el Cliente que realiza el abono (*):",
             options=list(opciones_usuarios.keys()),
+            index=0,
         )
         id_usuario_abono = opciones_usuarios.get(usuario_abono_sel)
 
-        # Buscar el saldo deudor actual del cliente
-        idx_u = df_usuarios[df_usuarios["Id_Usuario"].astype(str) == str(id_usuario_abono)].index[0]
-        deuda_actual = float(df_usuarios.loc[idx_u, "Total_General"] or 0)
+        if id_usuario_abono:
+            idx_u = df_usuarios[df_usuarios["Id_Usuario"].astype(str) == str(id_usuario_abono)].index[0]
+            deuda_actual = float(df_usuarios.loc[idx_u, "Total_General"] or 0)
+            st.info(f"💡 **Saldo pendiente actual de este usuario:** ${deuda_actual:,.0f}")
+        else:
+            deuda_actual = 0
 
-        st.info(f"💡 **Saldo pendiente actual de este usuario:** ${deuda_actual:,.0f}")
-
-        monto_abono = st.number_input("Monto abonado ($):", min_value=0, step=1000)
+        monto_abono = st.number_input("Monto abonado ($):", min_value=0, value=0, step=1000)
 
         if st.button("💰 Registrar Abono", type="primary"):
-            if not id_usuario_abono or monto_abono <= 0:
-                st.error("Ingresa un monto mayor a 0.")
+            if usuario_abono_sel == OPCION_VACIA or not id_usuario_abono:
+                st.error("⚠️ Debes seleccionar un cliente de la lista.")
+            elif monto_abono <= 0:
+                st.error("⚠️ Ingresa un monto a abonar mayor a $0.")
             elif monto_abono > deuda_actual:
                 st.error(f"⚠️ El abono (${monto_abono:,.0f}) no puede ser mayor al saldo pendiente actual (${deuda_actual:,.0f}).")
             else:
@@ -266,13 +278,13 @@ elif rol == "➕ Registrar Nuevo Usuario":
     col_u1, col_u2 = st.columns(2)
 
     with col_u1:
-        nuevo_id = st.text_input("Id_Usuario / Cédula / Documento (*):")
-        nuevo_nombre = st.text_input("Nombre Completo (*):")
-        nueva_area = st.text_input("Área / Departamento:")
+        nuevo_id = st.text_input("Id_Usuario / Cédula / Documento (*):", value="")
+        nuevo_nombre = st.text_input("Nombre Completo (*):", value="")
+        nueva_area = st.text_input("Área / Departamento:", value="")
 
     with col_u2:
-        nuevo_correo = st.text_input("Correo Electrónico:")
-        nuevo_whatsapp = st.text_input("Número de WhatsApp / Celular:")
+        nuevo_correo = st.text_input("Correo Electrónico:", value="")
+        nuevo_whatsapp = st.text_input("Número de WhatsApp / Celular:", value="")
 
     if st.button("👤 Registrar Usuario", type="primary"):
         if not nuevo_id.strip() or not nuevo_nombre.strip():
@@ -295,13 +307,13 @@ elif rol == "➕ Registrar Nuevo Usuario":
 elif rol == "👤 Consultar Mi Cuenta (Consumidor)":
     st.header("Consulta de Estado de Cuenta")
 
-    id_consulta = st.text_input("Ingresa tu Id_Usuario / Cédula:")
+    id_consulta = st.text_input("Ingresa tu Id_Usuario / Cédula:", value="")
 
-    if id_consulta:
+    if id_consulta.strip():
         df_usuarios = pd.DataFrame(hoja_usuarios.get_all_records())
 
         if not df_usuarios.empty:
-            match_user = df_usuarios[df_usuarios["Id_Usuario"].astype(str) == str(id_consulta)]
+            match_user = df_usuarios[df_usuarios["Id_Usuario"].astype(str) == str(id_consulta.strip())]
 
             if not match_user.empty:
                 usuario_info = match_user.iloc[0]
@@ -317,7 +329,7 @@ elif rol == "👤 Consultar Mi Cuenta (Consumidor)":
 
                 df_consumos = pd.DataFrame(hoja_consumos.get_all_records())
                 if not df_consumos.empty:
-                    mis_consumos = df_consumos[df_consumos["Id_Usuario"].astype(str) == str(id_consulta)]
+                    mis_consumos = df_consumos[df_consumos["Id_Usuario"].astype(str) == str(id_consulta.strip())]
                     if not mis_consumos.empty:
                         tabla_ver = mis_consumos[["Fecha", "Producto", "Cantidad", "Valor", "Total"]].sort_values(
                             by="Fecha", ascending=False
