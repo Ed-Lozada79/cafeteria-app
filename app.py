@@ -1,4 +1,5 @@
 import datetime
+import json
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
@@ -19,17 +20,31 @@ SCOPES = [
 
 @st.cache_resource
 def conectar_sheets():
-    # Si estamos en Streamlit Cloud, lee desde Secrets
+    # 1. Intentar conectar vía Streamlit Secrets (Nube)
     if "gcp_service_account" in st.secrets:
         creds_dict = dict(st.secrets["gcp_service_account"])
+        # Corregir saltos de línea en la clave privada si vienen formateados
+        if "private_key" in creds_dict:
+            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-    # Si estamos en Local, lee el archivo local
+    # 2. Intentar conectar vía archivo local credentials.json
     else:
-        creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
-        
+        creds = Credentials.from_service_account_file(
+            "credentials.json", scopes=SCOPES
+        )
+
     client = gspread.authorize(creds)
     sheet = client.open("Cafeteria_BD")
     return sheet
+
+
+try:
+    sheet = conectar_sheets()
+    hoja_consumos = sheet.worksheet("Consumos")
+    hoja_usuarios = sheet.worksheet("Usuarios")
+except Exception as e:
+    st.error(f"❌ Error al conectar con Google Sheets: {e}")
+    st.stop()
 
 # ---------------------------------------------------------
 # Interfaz Principal y Navegación
