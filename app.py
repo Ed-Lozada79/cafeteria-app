@@ -20,14 +20,11 @@ SCOPES = [
 
 @st.cache_resource
 def conectar_sheets():
-    # 1. Intentar conectar vía Streamlit Secrets (Nube)
     if "gcp_service_account" in st.secrets:
         creds_dict = dict(st.secrets["gcp_service_account"])
-        # Corregir saltos de línea en la clave privada si vienen formateados
         if "private_key" in creds_dict:
             creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-    # 2. Intentar conectar vía archivo local credentials.json
     else:
         creds = Credentials.from_service_account_file(
             "credentials.json", scopes=SCOPES
@@ -47,19 +44,30 @@ except Exception as e:
     st.stop()
 
 # ---------------------------------------------------------
-# Interfaz Principal y Navegación
+# Detección de Parámetros URL (Modo QR vs Modo Admin)
 # ---------------------------------------------------------
-st.title("☕ Sistema de Registro y Control - Cafetería")
+params = st.query_params
+vista_qr = params.get("vista", None)
 
-rol = st.sidebar.radio(
-    "Selecciona la vista:",
-    [
+# Si el QR dirige a ?vista=consulta o ?vista=registro
+if vista_qr == "consulta":
+    st.sidebar.title("📌 Menú Cliente")
+    opciones = ["👤 Consultar Mi Cuenta (Consumidor)"]
+elif vista_qr == "registro":
+    st.sidebar.title("📌 Menú Cliente")
+    opciones = ["➕ Registrar Nuevo Usuario"]
+else:
+    # Modo completo (Administrador)
+    st.sidebar.title("⚙️ Panel de Control")
+    opciones = [
         "🛒 Registrar Consumo (Cafetería)",
         "💳 Registrar Abono (Cafetería)",
         "➕ Registrar Nuevo Usuario",
         "👤 Consultar Mi Cuenta (Consumidor)",
-    ],
-)
+        "📱 Generar Códigos QR",
+    ]
+
+rol = st.sidebar.radio("Selecciona la vista:", opciones)
 
 # ---------------------------------------------------------
 # VISTA 1: REGISTRAR CONSUMO (CAFETERÍA)
@@ -115,11 +123,9 @@ if rol == "🛒 Registrar Consumo (Cafetería)":
                         float(valor_unitario),
                         float(total_pedido),
                     ]
-                    
-                    # Insertar en la FILA 2 (Al principio de la tabla Consumos)
+
                     hoja_consumos.insert_row(nueva_fila, index=2)
 
-                    # Actualizar 'Total_Parcial' y 'Total_General' en 'Usuarios'
                     idx = df_usuarios[df_usuarios["Id_Usuario"].astype(str) == str(id_usuario)].index[0]
                     num_fila = idx + 2
 
@@ -130,7 +136,7 @@ if rol == "🛒 Registrar Consumo (Cafetería)":
                     hoja_usuarios.update_cell(num_fila, 6, val_parcial)
                     hoja_usuarios.update_cell(num_fila, 8, val_general)
 
-                    st.success(f"✅ ¡Consumo de ${total_pedido:,.0f} registrado al inicio para {usuario_seleccionado}!")
+                    st.success(f"✅ ¡Consumo de ${total_pedido:,.0f} registrado exitosamente!")
                     st.cache_resource.clear()
 
 # ---------------------------------------------------------
@@ -223,9 +229,7 @@ elif rol == "➕ Registrar Nuevo Usuario":
                         0,
                     ]
 
-                    # Insertar en la FILA 2 (Al principio de la tabla Usuarios)
                     hoja_usuarios.insert_row(nuevo_registro, index=2)
-                    
                     st.success(f"✅ ¡El usuario **{nuevo_nombre}** fue registrado exitosamente!")
                     st.cache_resource.clear()
 
@@ -267,3 +271,38 @@ elif rol == "👤 Consultar Mi Cuenta (Consumidor)":
                         st.info("No tienes consumos detallados registrados.")
             else:
                 st.warning("No se encontró ningún usuario con ese número de identificación.")
+
+# ---------------------------------------------------------
+# VISTA 5: GENERADOR DE CÓDIGOS QR
+# ---------------------------------------------------------
+elif rol == "📱 Generar Códigos QR":
+    st.header("Generador de Códigos QR para Imprimir")
+    st.write("Copia la URL pública de tu aplicación desplegada en Streamlit Cloud y pégala aquí abajo:")
+
+    url_base = st.text_input(
+        "URL de tu app en Streamlit Cloud:",
+        value="https://cafeteria-app-dw9qrntictwnamwwzpmddb.streamlit.app",  # Cambia por tu URL si es distinta
+    )
+
+    if url_base:
+        # Asegurar que termine sin diagonal /
+        url_base = url_base.rstrip("/")
+
+        url_consulta = f"{url_base}/?vista=consulta"
+        url_registro = f"{url_base}/?vista=registro"
+
+        col_qr1, col_qr2 = st.columns(2)
+
+        with col_qr1:
+            st.subheader("1. QR - Consulta de Saldo")
+            st.write("Imprime este QR para colocarlo en las mesas o mostrador.")
+            qr_api_1 = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={url_consulta}"
+            st.image(qr_api_1)
+            st.code(url_consulta)
+
+        with col_qr2:
+            st.subheader("2. QR - Registro de Nuevos Usuarios")
+            st.write("Imprime este QR para que nuevos clientes se registren.")
+            qr_api_2 = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={url_registro}"
+            st.image(qr_api_2)
+            st.code(url_registro)
