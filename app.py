@@ -19,17 +19,17 @@ SCOPES = [
 
 @st.cache_resource
 def conectar_sheets():
-    creds = Credentials.from_service_account_file(
-        "credentials.json", scopes=SCOPES
-    )
+    # Si estamos en Streamlit Cloud, lee desde Secrets
+    if "gcp_service_account" in st.secrets:
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    # Si estamos en Local, lee el archivo local
+    else:
+        creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
+        
     client = gspread.authorize(creds)
     sheet = client.open("Cafeteria_BD")
     return sheet
-
-
-sheet = conectar_sheets()
-hoja_consumos = sheet.worksheet("Consumos")
-hoja_usuarios = sheet.worksheet("Usuarios")
 
 # ---------------------------------------------------------
 # Interfaz Principal y Navegación
